@@ -1,0 +1,55 @@
+<idea-plugin>
+    <id>com.downstreamcallgraph</id>
+    <name>Downstream Call Graph</name>
+    <vendor>DownstreamCallGraph</vendor>
+
+    <description><![CDATA[
+    <p><strong>Downstream Call Graph</strong> visualizes downstream (callee) relationships for any Java method,
+    showing what methods are called recursively, and lets you jump straight to definitions or call sites.</p>
+
+    <h3>How to use</h3>
+    <ol>
+      <li><strong>Right-click on a method</strong> and select <em>Generate Downstream Call Graph</em> from the context menu</li>
+      <li><strong>Open DownstreamCallGraph tool window</strong> (View -> Tool Windows -> DownstreamCallGraph), place your caret on any Java method, and click the Generate button</li>
+      <li><strong>Use keyboard shortcut</strong> Alt+Shift+D (Option+Shift+D on macOS) while your caret is on a method</li>
+      <li><strong>Explore the graph:</strong> Click nodes to open methods, click edges to jump to exact calling lines</li>
+      <li><strong>Export:</strong> Save as standalone HTML or export as LLM-readable Markdown</li>
+    </ol>
+
+    <h3>Key features</h3>
+    <ul>
+      <li>Downstream (callee) call graph visualization with hierarchical layout</li>
+      <li>Configurable max depth for recursive traversal</li>
+      <li>Filters library/JDK methods, includes constructors and method references</li>
+      <li>Direct navigation to method definitions and call sites</li>
+      <li>Export diagrams as standalone HTML files</li>
+      <li>Export as Markdown with call tree and source code for LLM consumption</li>
+    </ul>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+
+    <idea-version since-build="211"/>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="DownstreamCallGraph" icon="AllIcons.Hierarchy.Subtypes"
+                    anchor="bottom"
+                    factoryClass="com.downstreamcallgraph.CallGraphToolWindowFactory"/>
+        <projectService serviceImplementation="com.downstreamcallgraph.settings.CallGraphSettings"/>
+        <projectService serviceImplementation="com.downstreamcallgraph.DownstreamCallGraphGenerator"/>
+        <projectService serviceImplementation="com.downstreamcallgraph.browser.BrowserManager"/>
+    </extensions>
+
+    <actions>
+        <action id="DownstreamCallGraph.Generate"
+                class="com.downstreamcallgraph.actions.GenerateCallGraphAction"
+                text="Generate Downstream Call Graph"
+                description="Generate downstream call graph for the current method"
+                icon="AllIcons.Hierarchy.Subtypes">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="alt shift D"/>
+        </action>
+    </actions>
+</idea-plugin>
