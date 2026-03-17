@@ -1,7 +1,8 @@
 package com.downstreamcallgraph.browser.handlers;
 
-import com.downstreamcallgraph.DownstreamCallGraphGenerator;
+import com.downstreamcallgraph.CallGraphDataProvider;
 import com.downstreamcallgraph.Utils;
+import com.downstreamcallgraph.browser.BrowserManager;
 import com.downstreamcallgraph.browser.JSQueryHandler;
 import com.downstreamcallgraph.settings.CallGraphSettings;
 import com.intellij.openapi.application.ApplicationManager;
@@ -32,12 +33,14 @@ public class SaveAsHtmlHandler extends JSQueryHandler {
             FileChooserDescriptor descriptor = new FileChooserDescriptor(false, true, false, false, false, false);
             ApplicationManager.getApplication().invokeLater(() -> FileChooser.chooseFile(descriptor, project, null, (VirtualFile file) -> {
                 try {
+                    CallGraphDataProvider provider = BrowserManager.getInstance(project).getActiveProvider();
                     String saveAsTemplate = Utils.getResourceFileAsString("build/saveas.html");
-                    PsiMethod lastGeneratedMethod = DownstreamCallGraphGenerator.getInstance(project).getLastGeneratedMethod();
+                    PsiMethod lastGeneratedMethod = provider.getLastGeneratedMethod();
                     String className = lastGeneratedMethod.getContainingClass().getName();
                     String methodName = lastGeneratedMethod.getName();
                     String methodPath = className + "." + methodName;
-                    String title = "Downstream Call Graph of " + project.getName() + " - " + methodPath;
+                    String direction = provider.getDirection();
+                    String title = direction + " Call Graph of " + project.getName() + " - " + methodPath;
 
                     CallGraphSettings settings = CallGraphSettings.getInstance(project);
                     String backgroundColor = settings.getCustomBackgroundColor();
@@ -48,8 +51,8 @@ public class SaveAsHtmlHandler extends JSQueryHandler {
 
                     saveAsTemplate = saveAsTemplate.replace("${title}", title);
                     saveAsTemplate = saveAsTemplate.replace("background: black;", "background: " + backgroundColor + ";");
-                    saveAsTemplate += "<script>updateNetwork(" + DownstreamCallGraphGenerator.getInstance(project).getJson() + ")</script>";
-                    Utils.writeToFile(file.getPath() + "/downstream_callgraph_" + project.getName() + "_" + className + "_" + methodName + ".html", saveAsTemplate);
+                    saveAsTemplate += "<script>updateNetwork(" + provider.getJson() + ")</script>";
+                    Utils.writeToFile(file.getPath() + "/" + direction.toLowerCase() + "_callgraph_" + project.getName() + "_" + className + "_" + methodName + ".html", saveAsTemplate);
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }

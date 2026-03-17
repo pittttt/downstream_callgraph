@@ -1,6 +1,5 @@
 package com.downstreamcallgraph.browser.handlers;
 
-import com.downstreamcallgraph.DownstreamCallGraphGenerator;
 import com.downstreamcallgraph.browser.BrowserManager;
 import com.downstreamcallgraph.browser.JSQueryHandler;
 import com.intellij.codeInsight.navigation.NavigationUtil;
@@ -30,7 +29,7 @@ public class GoToSourceHandler extends JSQueryHandler {
                 return null;
             }
 
-            PsiElement element = DownstreamCallGraphGenerator.getInstance(project).getReference(Integer.parseInt(nodeHashCode));
+            PsiElement element = BrowserManager.getInstance(project).getActiveProvider().getReference(Integer.parseInt(nodeHashCode));
             if (element != null) {
                 ApplicationManager.getApplication().invokeLater(() -> NavigationUtil.activateFileWithPsiElement(element));
             }

@@ -1,5 +1,7 @@
 package com.downstreamcallgraph.browser;
 
+import com.downstreamcallgraph.CallGraphDataProvider;
+import com.downstreamcallgraph.DownstreamCallGraphGenerator;
 import com.downstreamcallgraph.Utils;
 import com.downstreamcallgraph.settings.CallGraphSettings;
 import com.intellij.openapi.components.Service;
@@ -23,6 +25,7 @@ public final class BrowserManager {
     private final Project project;
     private final JBCefBrowser browser;
     private final AtomicBoolean browserInitialized = new AtomicBoolean(false);
+    private CallGraphDataProvider activeProvider;
 
     public BrowserManager(Project project) {
         this.project = project;
@@ -82,6 +85,17 @@ public final class BrowserManager {
             });
             timer.start();
         }
+    }
+
+    public void setActiveProvider(CallGraphDataProvider provider) {
+        this.activeProvider = provider;
+    }
+
+    public CallGraphDataProvider getActiveProvider() {
+        if (activeProvider == null) {
+            return DownstreamCallGraphGenerator.getInstance(project);
+        }
+        return activeProvider;
     }
 
     public void applySettings() {

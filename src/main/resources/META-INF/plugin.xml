@@ -38,6 +38,7 @@
                     factoryClass="com.downstreamcallgraph.CallGraphToolWindowFactory"/>
         <projectService serviceImplementation="com.downstreamcallgraph.settings.CallGraphSettings"/>
         <projectService serviceImplementation="com.downstreamcallgraph.DownstreamCallGraphGenerator"/>
+        <projectService serviceImplementation="com.downstreamcallgraph.UpstreamCallGraphGenerator"/>
         <projectService serviceImplementation="com.downstreamcallgraph.browser.BrowserManager"/>
     </extensions>
 
@@ -50,6 +51,15 @@
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
             <keyboard-shortcut keymap="$default" first-keystroke="alt shift D"/>
+        </action>
+        <action id="UpstreamCallGraph.Generate"
+                class="com.downstreamcallgraph.actions.GenerateUpstreamCallGraphAction"
+                text="Generate Upstream Call Graph"
+                description="Generate upstream (caller) call graph for the current method"
+                icon="AllIcons.Hierarchy.Supertypes">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="alt shift U"/>
         </action>
     </actions>
 </idea-plugin>

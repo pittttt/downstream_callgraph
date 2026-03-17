@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 public class MarkdownExporter {
 
     public static String export(List<NodeInfo> nodes, List<EdgeInfo> edges, int maxDepth,
-                                boolean includeSource) {
+                                boolean includeSource, String direction) {
         if (nodes.isEmpty()) return "";
 
         NodeInfo root = nodes.get(0);
@@ -19,7 +19,7 @@ public class MarkdownExporter {
         sb.append("# Call Graph: ").append(root.className).append(".").append(root.methodName).append("\n\n");
         sb.append("| Property | Value |\n|---|---|\n");
         sb.append("| Method | `").append(root.signature).append("` |\n");
-        sb.append("| Direction | DOWNSTREAM |\n");
+        sb.append("| Direction | ").append(direction).append(" |\n");
         sb.append("| Max Depth | ").append(maxDepth).append(" |\n");
         sb.append("| Total Methods | ").append(nodes.size()).append(" |\n\n");
 

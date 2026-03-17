@@ -29,6 +29,8 @@ public class CallGraphSettingsDialog extends DialogWrapper {
     private JBCheckBox includeConstructorsCheckBox;
     private JBCheckBox includeMethodRefsCheckBox;
     private JBCheckBox includeSourceCheckBox;
+    private JBCheckBox renderVisualGraphCheckBox;
+    private JTextArea excludedMethodsArea;
 
     private String selectedBackgroundType;
     private String selectedCustomColor;
@@ -55,12 +57,11 @@ public class CallGraphSettingsDialog extends DialogWrapper {
     @Override
     protected JComponent createCenterPanel() {
         JPanel dialogPanel = new JPanel(new BorderLayout());
-        dialogPanel.setPreferredSize(new Dimension(420, 360));
+        dialogPanel.setPreferredSize(new Dimension(420, 500));
 
         JTabbedPane tabbedPane = new JTabbedPane();
         tabbedPane.addTab("Graph", createGraphPanel());
         tabbedPane.addTab("Appearance", createAppearancePanel());
-        tabbedPane.addTab("Export", createExportPanel());
 
         dialogPanel.add(tabbedPane, BorderLayout.CENTER);
         return dialogPanel;
@@ -99,10 +100,32 @@ public class CallGraphSettingsDialog extends DialogWrapper {
         includeMethodRefsCheckBox = new JBCheckBox("Include method references (Foo::bar)", settings.isIncludeMethodReferences());
         panel.add(includeMethodRefsCheckBox, c);
 
-        // Spacer
+        // Render visual graph
         c.gridy = 4;
+        renderVisualGraphCheckBox = new JBCheckBox("Render visual call graph", settings.isRenderVisualGraph());
+        panel.add(renderVisualGraphCheckBox, c);
+
+        // Include source in markdown
+        c.gridy = 5;
+        includeSourceCheckBox = new JBCheckBox("Include source code in Markdown export", settings.isIncludeSourceInMarkdown());
+        panel.add(includeSourceCheckBox, c);
+
+        // Excluded methods label
+        c.gridy = 6;
+        c.gridwidth = 2;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.weighty = 0;
+        panel.add(new JLabel("Excluded methods (one per line, supports * wildcard, e.g. *.from):"), c);
+
+        // Excluded methods textarea
+        c.gridy = 7;
+        c.fill = GridBagConstraints.BOTH;
         c.weighty = 1.0;
-        panel.add(new JPanel(), c);
+        excludedMethodsArea = new JTextArea(settings.getExcludedMethods());
+        excludedMethodsArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        JScrollPane scrollPane = new JScrollPane(excludedMethodsArea);
+        scrollPane.setMinimumSize(new Dimension(350, 80));
+        panel.add(scrollPane, c);
 
         return panel;
     }
@@ -196,28 +219,6 @@ public class CallGraphSettingsDialog extends DialogWrapper {
         return panel;
     }
 
-    private JPanel createExportPanel() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBorder(JBUI.Borders.empty(5));
-
-        GridBagConstraints c = new GridBagConstraints();
-        c.gridx = 0;
-        c.gridy = 0;
-        c.anchor = GridBagConstraints.WEST;
-        c.insets = JBUI.insets(5, 5, 5, 5);
-        c.gridwidth = 2;
-
-        includeSourceCheckBox = new JBCheckBox("Include source code in Markdown export",
-                settings.isIncludeSourceInMarkdown());
-        panel.add(includeSourceCheckBox, c);
-
-        c.gridy = 1;
-        c.weighty = 1.0;
-        panel.add(new JPanel(), c);
-
-        return panel;
-    }
-
     private void updateColorPreview() {
         try {
             colorPreview.setBackground(Color.decode(selectedCustomColor));
@@ -234,7 +235,9 @@ public class CallGraphSettingsDialog extends DialogWrapper {
         settings.setFilterLibraryMethods(filterLibraryCheckBox.isSelected());
         settings.setIncludeConstructors(includeConstructorsCheckBox.isSelected());
         settings.setIncludeMethodReferences(includeMethodRefsCheckBox.isSelected());
+        settings.setRenderVisualGraph(renderVisualGraphCheckBox.isSelected());
         settings.setIncludeSourceInMarkdown(includeSourceCheckBox.isSelected());
+        settings.setExcludedMethods(excludedMethodsArea.getText());
 
         com.downstreamcallgraph.browser.BrowserManager.getInstance(project).applySettings();
         super.doOKAction();

@@ -7,6 +7,8 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
+import com.intellij.psi.search.GlobalSearchScope;
+import com.intellij.psi.search.searches.MethodReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.NotNull;
 import org.json.simple.JSONArray;
@@ -16,93 +18,53 @@ import java.util.*;
 
 @SuppressWarnings("unchecked")
 @Service(Service.Level.PROJECT)
-public final class DownstreamCallGraphGenerator implements CallGraphDataProvider {
+public final class UpstreamCallGraphGenerator implements CallGraphDataProvider {
     private final Project project;
-    private final JSONArray nodes;
-    private final JSONArray edges;
-    private final JSONObject groups;
+    private final JSONArray nodes = new JSONArray();
+    private final JSONArray edges = new JSONArray();
+    private final JSONObject groups = new JSONObject();
     private final HashMap<Integer, PsiElement> references = new HashMap<>();
-    private final List<NodeInfo> nodeInfoList = new ArrayList<>();
-    private final List<EdgeInfo> edgeInfoList = new ArrayList<>();
+    private final List<DownstreamCallGraphGenerator.NodeInfo> nodeInfoList = new ArrayList<>();
+    private final List<DownstreamCallGraphGenerator.EdgeInfo> edgeInfoList = new ArrayList<>();
     private final Map<String, Integer> methodKeyToNodeId = new HashMap<>();
     private PsiMethod lastGeneratedMethod;
     private int maxDepth = 5;
     private int nextNodeId = 1;
     private int nextEdgeId = 1;
 
-    public static class NodeInfo {
-        public final int id;
-        public final String className;
-        public final String qualifiedClassName;
-        public final String methodName;
-        public final String signature;
-        public final String filePath;
-        public final int lineNumber;
-        public final String sourceCode;
-        public final int level;
-
-        public NodeInfo(int id, String className, String qualifiedClassName, String methodName,
-                        String signature, String filePath, int lineNumber, String sourceCode, int level) {
-            this.id = id;
-            this.className = className;
-            this.qualifiedClassName = qualifiedClassName;
-            this.methodName = methodName;
-            this.signature = signature;
-            this.filePath = filePath;
-            this.lineNumber = lineNumber;
-            this.sourceCode = sourceCode;
-            this.level = level;
-        }
-    }
-
-    public static class EdgeInfo {
-        public final int fromId;
-        public final int toId;
-        public final String label;
-
-        public EdgeInfo(int fromId, int toId, String label) {
-            this.fromId = fromId;
-            this.toId = toId;
-            this.label = label;
-        }
-    }
-
-    public DownstreamCallGraphGenerator(Project project) {
+    public UpstreamCallGraphGenerator(Project project) {
         this.project = project;
-        this.nodes = new JSONArray();
-        this.edges = new JSONArray();
-        this.groups = new JSONObject();
     }
 
-    public static DownstreamCallGraphGenerator getInstance(Project project) {
-        return project.getService(DownstreamCallGraphGenerator.class);
+    public static UpstreamCallGraphGenerator getInstance(Project project) {
+        return project.getService(UpstreamCallGraphGenerator.class);
     }
 
-    public String generate(PsiMethod mainMethod) {
+    public String generate(PsiMethod targetMethod) {
         CallGraphSettings settings = CallGraphSettings.getInstance(project);
         this.maxDepth = settings.getMaxDepth();
 
         BrowserManager.getInstance(project).showMessage("Clearing the graph...");
         clear();
 
-        lastGeneratedMethod = mainMethod;
+        lastGeneratedMethod = targetMethod;
 
-        String mainKey = getMethodKey(mainMethod);
+        String mainKey = getMethodKey(targetMethod);
         int mainNodeId = nextNodeId++;
         methodKeyToNodeId.put(mainKey, mainNodeId);
-        references.put(mainNodeId, mainMethod);
+        references.put(mainNodeId, targetMethod);
 
-        JSONObject mainNode = createMethodNode(mainMethod, 0, mainNodeId);
+        JSONObject mainNode = createMethodNode(targetMethod, 0, mainNodeId);
         mainNode.put("shape", "ellipse");
 
-        createGroupIfNotExists(mainMethod);
+        createGroupIfNotExists(targetMethod);
         nodes.add(mainNode);
 
-        BrowserManager.getInstance(project).showMessage("Collecting downstream callees (depth 0/" + maxDepth + ")...");
+        BrowserManager.getInstance(project).showMessage("Collecting upstream callers (depth 0/" + maxDepth + ")...");
 
         Set<String> visited = new HashSet<>();
         visited.add(mainKey);
-        findAndAddCallees(mainMethod, mainNodeId, 0, visited);
+        findAndAddCallers(targetMethod, mainNodeId, 0, visited);
 
         BrowserManager.getInstance(project).showMessage(
                 "Done. Found " + nodes.size() + " methods, " + edges.size() + " calls. Rendering...");
@@ -121,7 +83,7 @@ public final class DownstreamCallGraphGenerator implements CallGraphDataProvider
 
     @Override
     public String getDirection() {
-        return "DOWNSTREAM";
+        return "UPSTREAM";
     }
 
     private void clear() {
@@ -136,97 +98,53 @@ public final class DownstreamCallGraphGenerator implements CallGraphDataProvider
         nextEdgeId = 1;
     }
 
-    private void findAndAddCallees(PsiMethod method, int callerNodeId, int depth, Set<String> visited) {
+    private void findAndAddCallers(PsiMethod method, int currentNodeId, int depth, Set<String> visited) {
         if (depth >= maxDepth) return;
 
         CallGraphSettings settings = CallGraphSettings.getInstance(project);
-        PsiCodeBlock body = method.getBody();
-        if (body == null) return;
 
         BrowserManager.getInstance(project).showMessage(
-                "Scanning depth " + depth + "/" + maxDepth
-                + " — " + nodes.size() + " methods found so far...");
+                "Scanning upstream depth " + depth + "/" + maxDepth
+                        + " — " + nodes.size() + " methods found so far...");
 
-        // 1. Regular method calls: method(), sorted by source text offset for execution order
-        List<PsiMethodCallExpression> calls = new ArrayList<>(
-                PsiTreeUtil.findChildrenOfType(body, PsiMethodCallExpression.class));
-        calls.sort(Comparator.comparingInt(c -> {
-            PsiElement nameElement = c.getMethodExpression().getReferenceNameElement();
-            return nameElement != null ? nameElement.getTextOffset() : c.getTextOffset();
-        }));
-        for (PsiMethodCallExpression call : calls) {
-            PsiMethod callee = call.resolveMethod();
-            if (callee == null) continue;
-            if (settings.isFilterLibraryMethods() && !isProjectMethod(callee)) {
-                resolveAnonymousClassCallees(call, method, callerNodeId, depth, visited);
-                continue;
+        Collection<PsiReference> refs = MethodReferencesSearch.search(
+                method, GlobalSearchScope.projectScope(project), false).findAll();
+
+        for (PsiReference ref : refs) {
+            PsiElement element = ref.getElement();
+            PsiMethod caller = PsiTreeUtil.getParentOfType(element, PsiMethod.class);
+            if (caller == null) continue;
+            if (settings.isFilterLibraryMethods() && !isProjectMethod(caller)) continue;
+
+            PsiClass callerClass = caller.getContainingClass();
+            if (callerClass != null) {
+                if (settings.isMethodExcluded(callerClass.getName(), callerClass.getQualifiedName(), caller.getName())) {
+                    continue;
+                }
             }
 
-            processCallee(method, callerNodeId, callee, call, depth, visited);
-        }
-
-        // 2. Constructor calls: new Foo()
-        if (settings.isIncludeConstructors()) {
-            Collection<PsiNewExpression> newExprs =
-                    PsiTreeUtil.findChildrenOfType(body, PsiNewExpression.class);
-            for (PsiNewExpression newExpr : newExprs) {
-                PsiMethod constructor = newExpr.resolveConstructor();
-                if (constructor == null) continue;
-                if (settings.isFilterLibraryMethods() && !isProjectMethod(constructor)) continue;
-
-                processCallee(method, callerNodeId, constructor, newExpr, depth, visited);
+            String key = getMethodKey(caller);
+            Integer callerNodeId = methodKeyToNodeId.get(key);
+            boolean isNew = (callerNodeId == null);
+            if (isNew) {
+                callerNodeId = nextNodeId++;
+                methodKeyToNodeId.put(key, callerNodeId);
             }
-        }
 
-        // 3. Method references: Foo::bar
-        if (settings.isIncludeMethodReferences()) {
-            Collection<PsiMethodReferenceExpression> methodRefs =
-                    PsiTreeUtil.findChildrenOfType(body, PsiMethodReferenceExpression.class);
-            for (PsiMethodReferenceExpression methodRef : methodRefs) {
-                PsiElement resolved = methodRef.resolve();
-                if (!(resolved instanceof PsiMethod)) continue;
-                PsiMethod callee = (PsiMethod) resolved;
-                if (settings.isFilterLibraryMethods() && !isProjectMethod(callee)) continue;
+            int edgeId = nextEdgeId++;
+            references.put(edgeId, element);
+            JSONObject edge = createEdge(currentNodeId, callerNodeId, element, caller, edgeId);
+            edges.add(edge);
 
-                processCallee(method, callerNodeId, callee, methodRef, depth, visited);
+            if (isNew) {
+                visited.add(key);
+                references.put(callerNodeId, caller);
+                JSONObject callerNode = createMethodNode(caller, depth + 1, callerNodeId);
+                nodes.add(callerNode);
+                createGroupIfNotExists(caller);
+
+                findAndAddCallers(caller, callerNodeId, depth + 1, visited);
             }
-        }
-    }
-
-    private void processCallee(PsiMethod caller, int callerNodeId, PsiMethod callee,
-                               PsiElement callSite, int depth, Set<String> visited) {
-        PsiClass calleeClass = callee.getContainingClass();
-        if (calleeClass != null) {
-            CallGraphSettings settings = CallGraphSettings.getInstance(project);
-            if (settings.isMethodExcluded(calleeClass.getName(), calleeClass.getQualifiedName(), callee.getName())) {
-                return;
-            }
-        }
-
-        String key = getMethodKey(callee);
-
-        // Determine callee node ID (reuse if already created)
-        Integer calleeNodeId = methodKeyToNodeId.get(key);
-        boolean isNew = (calleeNodeId == null);
-        if (isNew) {
-            calleeNodeId = nextNodeId++;
-            methodKeyToNodeId.put(key, calleeNodeId);
-        }
-
-        // Always create the edge
-        int edgeId = nextEdgeId++;
-        references.put(edgeId, callSite);
-        JSONObject edge = createEdge(callerNodeId, calleeNodeId, callSite, caller, edgeId);
-        edges.add(edge);
-
-        if (isNew) {
-            visited.add(key);
-            references.put(calleeNodeId, callee);
-            JSONObject calleeNode = createMethodNode(callee, depth + 1, calleeNodeId);
-            nodes.add(calleeNode);
-            createGroupIfNotExists(callee);
-
-            findAndAddCallees(callee, calleeNodeId, depth + 1, visited);
         }
     }
 
@@ -235,62 +153,6 @@ public final class DownstreamCallGraphGenerator implements CallGraphDataProvider
         if (containingFile == null) return false;
         VirtualFile file = containingFile.getVirtualFile();
         return file != null && file.isInLocalFileSystem();
-    }
-
-    /**
-     * When a library method call is filtered (e.g. accountVOLazy.get()), try to resolve the
-     * receiver variable's initializer. If it's an anonymous inner class, lambda, or method
-     * reference defined in project source, trace into those instead.
-     */
-    private void resolveAnonymousClassCallees(PsiMethodCallExpression call, PsiMethod caller,
-                                              int callerNodeId, int depth, Set<String> visited) {
-        PsiExpression qualifier = call.getMethodExpression().getQualifierExpression();
-        if (!(qualifier instanceof PsiReferenceExpression)) return;
-
-        PsiElement resolved = ((PsiReferenceExpression) qualifier).resolve();
-        if (!(resolved instanceof PsiVariable)) return;
-
-        PsiExpression initializer = ((PsiVariable) resolved).getInitializer();
-        if (initializer == null) return;
-
-        if (initializer instanceof PsiNewExpression) {
-            PsiAnonymousClass anonymousClass = ((PsiNewExpression) initializer).getAnonymousClass();
-            if (anonymousClass == null) return;
-            for (PsiMethod method : anonymousClass.getMethods()) {
-                if (method.isConstructor()) continue;
-                processCallee(caller, callerNodeId, method, call, depth, visited);
-            }
-        } else if (initializer instanceof PsiLambdaExpression) {
-            PsiElement lambdaBody = ((PsiLambdaExpression) initializer).getBody();
-            if (lambdaBody != null) {
-                processLambdaBodyCallees(lambdaBody, caller, callerNodeId, depth, visited);
-            }
-        } else if (initializer instanceof PsiMethodReferenceExpression) {
-            PsiElement refResolved = ((PsiMethodReferenceExpression) initializer).resolve();
-            if (refResolved instanceof PsiMethod) {
-                processCallee(caller, callerNodeId, (PsiMethod) refResolved, call, depth, visited);
-            }
-        }
-    }
-
-    private void processLambdaBodyCallees(PsiElement lambdaBody, PsiMethod caller,
-                                          int callerNodeId, int depth, Set<String> visited) {
-        CallGraphSettings settings = CallGraphSettings.getInstance(project);
-        List<PsiMethodCallExpression> calls = new ArrayList<>();
-        if (lambdaBody instanceof PsiMethodCallExpression) {
-            calls.add((PsiMethodCallExpression) lambdaBody);
-        }
-        calls.addAll(PsiTreeUtil.findChildrenOfType(lambdaBody, PsiMethodCallExpression.class));
-
-        for (PsiMethodCallExpression call : calls) {
-            PsiMethod callee = call.resolveMethod();
-            if (callee == null) continue;
-            if (settings.isFilterLibraryMethods() && !isProjectMethod(callee)) {
-                resolveAnonymousClassCallees(call, caller, callerNodeId, depth, visited);
-                continue;
-            }
-            processCallee(caller, callerNodeId, callee, call, depth, visited);
-        }
     }
 
     private String getMethodKey(PsiMethod method) {
@@ -338,7 +200,7 @@ public final class DownstreamCallGraphGenerator implements CallGraphDataProvider
             edge.put("font", group.get("font"));
         }
 
-        edgeInfoList.add(new EdgeInfo(fromNodeId, toNodeId, ":" + lineNumber));
+        edgeInfoList.add(new DownstreamCallGraphGenerator.EdgeInfo(fromNodeId, toNodeId, ":" + lineNumber));
 
         return edge;
     }
@@ -368,7 +230,6 @@ public final class DownstreamCallGraphGenerator implements CallGraphDataProvider
         String label = className + "\n" + method.getName();
         node.put("label", label);
 
-        // Collect node info for markdown export
         String signature = getMethodSignature(method);
         String filePath = "";
         int lineNumber = 0;
@@ -386,7 +247,7 @@ public final class DownstreamCallGraphGenerator implements CallGraphDataProvider
         }
 
         String sourceCode = method.getText();
-        nodeInfoList.add(new NodeInfo(
+        nodeInfoList.add(new DownstreamCallGraphGenerator.NodeInfo(
                 nodeId, className, qualifiedName, method.getName(),
                 signature, filePath, lineNumber, sourceCode, depth
         ));
@@ -468,12 +329,12 @@ public final class DownstreamCallGraphGenerator implements CallGraphDataProvider
     }
 
     @Override
-    public List<NodeInfo> getNodeInfoList() {
+    public List<DownstreamCallGraphGenerator.NodeInfo> getNodeInfoList() {
         return nodeInfoList;
     }
 
     @Override
-    public List<EdgeInfo> getEdgeInfoList() {
+    public List<DownstreamCallGraphGenerator.EdgeInfo> getEdgeInfoList() {
         return edgeInfoList;
     }
 

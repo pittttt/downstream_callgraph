@@ -1,6 +1,6 @@
 package com.downstreamcallgraph.actions;
 
-import com.downstreamcallgraph.DownstreamCallGraphGenerator;
+import com.downstreamcallgraph.UpstreamCallGraphGenerator;
 import com.downstreamcallgraph.Utils;
 import com.downstreamcallgraph.browser.BrowserManager;
 import com.downstreamcallgraph.settings.CallGraphSettings;
@@ -20,7 +20,7 @@ import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.psi.PsiMethod;
 import org.jetbrains.annotations.NotNull;
 
-public class GenerateCallGraphAction extends AnAction implements DumbAware {
+public class GenerateUpstreamCallGraphAction extends AnAction implements DumbAware {
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
@@ -30,7 +30,7 @@ public class GenerateCallGraphAction extends AnAction implements DumbAware {
         if (DumbService.isDumb(project)) {
             Messages.showInfoMessage(project,
                     "Cannot generate call graph while indexing is in progress.\nPlease wait for indexing to complete.",
-                    "Downstream Call Graph");
+                    "Upstream Call Graph");
             return;
         }
 
@@ -39,21 +39,22 @@ public class GenerateCallGraphAction extends AnAction implements DumbAware {
 
         ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow("DownstreamCallGraph");
         if (toolWindow != null) {
-            toolWindow.show(() -> generateCallGraph(project, method));
+            toolWindow.show(() -> generateUpstreamCallGraph(project, method));
         }
     }
 
-    private void generateCallGraph(Project project, PsiMethod method) {
+    private void generateUpstreamCallGraph(Project project, PsiMethod method) {
         BrowserManager browserManager = BrowserManager.getInstance(project);
 
         browserManager.whenBrowserReady(() -> {
-            ProgressManager.getInstance().run(new Task.Backgroundable(project, "Generating Downstream Call Graph") {
+            ProgressManager.getInstance().run(new Task.Backgroundable(project, "Generating Upstream Call Graph") {
                 public void run(@NotNull ProgressIndicator progressIndicator) {
                     ApplicationManager.getApplication().runReadAction(() -> {
-                        browserManager.showMessage("Generating downstream call graph for " + method.getName() + "...");
-                        DownstreamCallGraphGenerator generator = DownstreamCallGraphGenerator.getInstance(project);
+                        browserManager.showMessage("Generating upstream call graph for " + method.getName() + "...");
+                        UpstreamCallGraphGenerator generator = UpstreamCallGraphGenerator.getInstance(project);
                         String graph = generator.generate(method);
                         browserManager.setActiveProvider(generator);
+
                         CallGraphSettings settings = CallGraphSettings.getInstance(project);
                         if (settings.isRenderVisualGraph()) {
                             browserManager.showMessage("Sending graph to embedded browser...");

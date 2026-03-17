@@ -1,7 +1,8 @@
 package com.downstreamcallgraph.browser.handlers;
 
-import com.downstreamcallgraph.DownstreamCallGraphGenerator;
+import com.downstreamcallgraph.CallGraphDataProvider;
 import com.downstreamcallgraph.Utils;
+import com.downstreamcallgraph.browser.BrowserManager;
 import com.downstreamcallgraph.browser.JSQueryHandler;
 import com.downstreamcallgraph.export.MarkdownExporter;
 import com.downstreamcallgraph.settings.CallGraphSettings;
@@ -30,20 +31,22 @@ public class ExportMarkdownHandler extends JSQueryHandler {
             FileChooserDescriptor descriptor = new FileChooserDescriptor(false, true, false, false, false, false);
             ApplicationManager.getApplication().invokeLater(() -> FileChooser.chooseFile(descriptor, project, null, (VirtualFile file) -> {
                 try {
-                    DownstreamCallGraphGenerator generator = DownstreamCallGraphGenerator.getInstance(project);
+                    CallGraphDataProvider provider = BrowserManager.getInstance(project).getActiveProvider();
                     CallGraphSettings settings = CallGraphSettings.getInstance(project);
-                    PsiMethod lastGeneratedMethod = generator.getLastGeneratedMethod();
+                    PsiMethod lastGeneratedMethod = provider.getLastGeneratedMethod();
                     String className = lastGeneratedMethod.getContainingClass().getName();
                     String methodName = lastGeneratedMethod.getName();
+                    String direction = provider.getDirection().toLowerCase();
 
                     String markdown = MarkdownExporter.export(
-                            generator.getNodeInfoList(),
-                            generator.getEdgeInfoList(),
-                            generator.getMaxDepth(),
-                            settings.isIncludeSourceInMarkdown()
+                            provider.getNodeInfoList(),
+                            provider.getEdgeInfoList(),
+                            provider.getMaxDepth(),
+                            settings.isIncludeSourceInMarkdown(),
+                            provider.getDirection()
                     );
 
-                    Utils.writeToFile(file.getPath() + "/downstream_callgraph_" + project.getName() + "_" + className + "_" + methodName + ".md", markdown);
+                    Utils.writeToFile(file.getPath() + "/" + direction + "_callgraph_" + project.getName() + "_" + className + "_" + methodName + ".md", markdown);
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }

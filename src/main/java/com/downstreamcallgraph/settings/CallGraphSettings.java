@@ -6,6 +6,8 @@ import com.intellij.util.xmlb.XmlSerializerUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.regex.Pattern;
+
 @Service(Service.Level.PROJECT)
 @State(
         name = "DownstreamCallGraphSettings",
@@ -22,6 +24,8 @@ public class CallGraphSettings implements PersistentStateComponent<CallGraphSett
     private boolean includeConstructors = true;
     private boolean includeMethodReferences = true;
     private boolean includeSourceInMarkdown = true;
+    private boolean renderVisualGraph = true;
+    private String excludedMethods = "";
 
     public static CallGraphSettings getInstance(Project project) {
         return project.getService(CallGraphSettings.class);
@@ -92,6 +96,57 @@ public class CallGraphSettings implements PersistentStateComponent<CallGraphSett
 
     public void setIncludeSourceInMarkdown(boolean includeSourceInMarkdown) {
         this.includeSourceInMarkdown = includeSourceInMarkdown;
+    }
+
+    public boolean isRenderVisualGraph() {
+        return renderVisualGraph;
+    }
+
+    public void setRenderVisualGraph(boolean renderVisualGraph) {
+        this.renderVisualGraph = renderVisualGraph;
+    }
+
+    public String getExcludedMethods() {
+        return excludedMethods;
+    }
+
+    public void setExcludedMethods(String excludedMethods) {
+        this.excludedMethods = excludedMethods != null ? excludedMethods : "";
+    }
+
+    public boolean isMethodExcluded(String simpleClassName, String qualifiedClassName, String methodName) {
+        if (excludedMethods == null || excludedMethods.isEmpty()) return false;
+        for (String line : excludedMethods.split("\n")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) continue;
+
+            int lastDot = trimmed.lastIndexOf('.');
+            String classPattern;
+            String methodPattern;
+            if (lastDot >= 0) {
+                classPattern = trimmed.substring(0, lastDot);
+                methodPattern = trimmed.substring(lastDot + 1);
+            } else {
+                classPattern = "*";
+                methodPattern = trimmed;
+            }
+
+            if (!globMatches(methodPattern, methodName)) continue;
+            if (simpleClassName != null && globMatches(classPattern, simpleClassName)) return true;
+            if (qualifiedClassName != null && globMatches(classPattern, qualifiedClassName)) return true;
+        }
+        return false;
+    }
+
+    private static boolean globMatches(String pattern, String text) {
+        if (text == null) return false;
+        String[] parts = pattern.split("\\*", -1);
+        StringBuilder regex = new StringBuilder();
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) regex.append(".*");
+            regex.append(Pattern.quote(parts[i]));
+        }
+        return text.matches(regex.toString());
     }
 
     public String getEffectiveBackgroundColor(String ideEditorBackgroundColor) {
