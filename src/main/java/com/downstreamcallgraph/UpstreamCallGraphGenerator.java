@@ -9,6 +9,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.searches.MethodReferencesSearch;
+import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.NotNull;
 import org.json.simple.JSONArray;
@@ -31,6 +32,7 @@ public final class UpstreamCallGraphGenerator implements CallGraphDataProvider {
     private int maxDepth = 5;
     private int nextNodeId = 1;
     private int nextEdgeId = 1;
+    private boolean silent;
 
     public UpstreamCallGraphGenerator(Project project) {
         this.project = project;
@@ -41,10 +43,15 @@ public final class UpstreamCallGraphGenerator implements CallGraphDataProvider {
     }
 
     public String generate(PsiMethod targetMethod) {
+        return generate(targetMethod, false);
+    }
+
+    public String generate(PsiMethod targetMethod, boolean silent) {
+        this.silent = silent;
         CallGraphSettings settings = CallGraphSettings.getInstance(project);
         this.maxDepth = settings.getMaxDepth();
 
-        BrowserManager.getInstance(project).showMessage("Clearing the graph...");
+        showProgress("Clearing the graph...");
         clear();
 
         lastGeneratedMethod = targetMethod;
@@ -60,16 +67,21 @@ public final class UpstreamCallGraphGenerator implements CallGraphDataProvider {
         createGroupIfNotExists(targetMethod);
         nodes.add(mainNode);
 
-        BrowserManager.getInstance(project).showMessage("Collecting upstream callers (depth 0/" + maxDepth + ")...");
+        showProgress("Collecting upstream callers...");
 
         Set<String> visited = new HashSet<>();
         visited.add(mainKey);
-        findAndAddCallers(targetMethod, mainNodeId, 0, visited);
+        findAndAddCallers(targetMethod, mainNodeId, 1, visited);
 
-        BrowserManager.getInstance(project).showMessage(
-                "Done. Found " + nodes.size() + " methods, " + edges.size() + " calls. Rendering...");
+        showProgress("Done. Found " + nodes.size() + " methods, " + edges.size() + " calls. Rendering...");
 
         return getJson();
+    }
+
+    private void showProgress(String message) {
+        if (!silent) {
+            BrowserManager.getInstance(project).showMessage(message);
+        }
     }
 
     @Override
@@ -99,18 +111,25 @@ public final class UpstreamCallGraphGenerator implements CallGraphDataProvider {
     }
 
     private void findAndAddCallers(PsiMethod method, int currentNodeId, int depth, Set<String> visited) {
-        if (depth >= maxDepth) return;
-
         CallGraphSettings settings = CallGraphSettings.getInstance(project);
 
-        BrowserManager.getInstance(project).showMessage(
-                "Scanning upstream depth " + depth + "/" + maxDepth
-                        + " — " + nodes.size() + " methods found so far...");
+        showProgress("Scanning upstream depth " + depth
+                + " — " + nodes.size() + " methods found so far...");
 
-        Collection<PsiReference> refs = MethodReferencesSearch.search(
-                method, GlobalSearchScope.projectScope(project), false).findAll();
+        Collection<PsiReference> allRefs = new ArrayList<>(
+                MethodReferencesSearch.search(method, GlobalSearchScope.projectScope(project), false).findAll());
 
-        for (PsiReference ref : refs) {
+        PsiClass containingClass = method.getContainingClass();
+        if (containingClass != null) {
+            for (PsiClass anInterface : containingClass.getInterfaces()) {
+                PsiMethod methodBySignature = anInterface.findMethodBySignature(method, false);
+                if (methodBySignature != null) {
+                    allRefs.addAll(ReferencesSearch.search(methodBySignature).findAll());
+                }
+            }
+        }
+
+        for (PsiReference ref : allRefs) {
             PsiElement element = ref.getElement();
             PsiMethod caller = PsiTreeUtil.getParentOfType(element, PsiMethod.class);
             if (caller == null) continue;
@@ -228,6 +247,15 @@ public final class UpstreamCallGraphGenerator implements CallGraphDataProvider {
         node.put("level", depth);
 
         String label = className + "\n" + method.getName();
+
+        PsiAnnotation restAnnotation = getRestMappingAnnotation(method);
+        if (restAnnotation != null) {
+            String restPath = buildRestPath(method, restAnnotation);
+            if (!restPath.isEmpty()) {
+                label = restPath + "\n" + label;
+            }
+        }
+
         node.put("label", label);
 
         String signature = getMethodSignature(method);
@@ -273,6 +301,58 @@ public final class UpstreamCallGraphGenerator implements CallGraphDataProvider {
         }
         sb.append(")");
         return sb.toString();
+    }
+
+    private PsiAnnotation getRestMappingAnnotation(PsiJvmModifiersOwner owner) {
+        for (PsiAnnotation annotation : owner.getAnnotations()) {
+            String qName = annotation.getQualifiedName();
+            if (qName != null && (qName.contains("GetMapping") || qName.contains("PostMapping")
+                    || qName.contains("PutMapping") || qName.contains("DeleteMapping")
+                    || qName.contains("RequestMapping"))) {
+                return annotation;
+            }
+        }
+        return null;
+    }
+
+    private String buildRestPath(PsiMethod method, PsiAnnotation methodAnnotation) {
+        StringBuilder path = new StringBuilder();
+
+        PsiClass containingClass = method.getContainingClass();
+        if (containingClass != null) {
+            PsiAnnotation classAnnotation = getRestMappingAnnotation(containingClass);
+            if (classAnnotation != null) {
+                String classPath = extractAnnotationValue(classAnnotation);
+                if (!classPath.isEmpty()) {
+                    path.append("/").append(classPath);
+                }
+            }
+        }
+
+        String methodPath = extractAnnotationValue(methodAnnotation);
+        if (!methodPath.isEmpty()) {
+            path.append("/").append(methodPath);
+        }
+
+        return path.toString();
+    }
+
+    private String extractAnnotationValue(PsiAnnotation annotation) {
+        PsiAnnotationMemberValue value = annotation.findAttributeValue("value");
+        if (value == null) return "";
+        String text = value.getText();
+        if (text.startsWith("\"") && text.endsWith("\"")) {
+            text = text.substring(1, text.length() - 1);
+        }
+        if (text.startsWith("{") && text.endsWith("}")) {
+            text = text.substring(1, text.length() - 1).trim();
+            if (text.startsWith("\"") && text.endsWith("\"")) {
+                text = text.substring(1, text.length() - 1);
+            }
+        }
+        while (text.startsWith("/")) text = text.substring(1);
+        while (text.endsWith("/")) text = text.substring(0, text.length() - 1);
+        return text;
     }
 
     private void createGroupIfNotExists(PsiMethod method) {

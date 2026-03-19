@@ -7,6 +7,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
+import com.intellij.psi.search.searches.OverridingMethodsSearch;
 import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.NotNull;
 import org.json.simple.JSONArray;
@@ -29,6 +30,7 @@ public final class DownstreamCallGraphGenerator implements CallGraphDataProvider
     private int maxDepth = 5;
     private int nextNodeId = 1;
     private int nextEdgeId = 1;
+    private boolean silent;
 
     public static class NodeInfo {
         public final int id;
@@ -79,10 +81,15 @@ public final class DownstreamCallGraphGenerator implements CallGraphDataProvider
     }
 
     public String generate(PsiMethod mainMethod) {
+        return generate(mainMethod, false);
+    }
+
+    public String generate(PsiMethod mainMethod, boolean silent) {
+        this.silent = silent;
         CallGraphSettings settings = CallGraphSettings.getInstance(project);
         this.maxDepth = settings.getMaxDepth();
 
-        BrowserManager.getInstance(project).showMessage("Clearing the graph...");
+        showProgress("Clearing the graph...");
         clear();
 
         lastGeneratedMethod = mainMethod;
@@ -98,16 +105,21 @@ public final class DownstreamCallGraphGenerator implements CallGraphDataProvider
         createGroupIfNotExists(mainMethod);
         nodes.add(mainNode);
 
-        BrowserManager.getInstance(project).showMessage("Collecting downstream callees (depth 0/" + maxDepth + ")...");
+        showProgress("Collecting downstream callees (depth 0/" + maxDepth + ")...");
 
         Set<String> visited = new HashSet<>();
         visited.add(mainKey);
         findAndAddCallees(mainMethod, mainNodeId, 0, visited);
 
-        BrowserManager.getInstance(project).showMessage(
-                "Done. Found " + nodes.size() + " methods, " + edges.size() + " calls. Rendering...");
+        showProgress("Done. Found " + nodes.size() + " methods, " + edges.size() + " calls. Rendering...");
 
         return getJson();
+    }
+
+    private void showProgress(String message) {
+        if (!silent) {
+            BrowserManager.getInstance(project).showMessage(message);
+        }
     }
 
     @Override
@@ -141,10 +153,18 @@ public final class DownstreamCallGraphGenerator implements CallGraphDataProvider
 
         CallGraphSettings settings = CallGraphSettings.getInstance(project);
         PsiCodeBlock body = method.getBody();
-        if (body == null) return;
+        if (body == null) {
+            Collection<PsiMethod> implementations = OverridingMethodsSearch
+                    .search(method, method.getUseScope(), true).findAll();
+            for (PsiMethod impl : implementations) {
+                if (impl.getBody() != null) {
+                    findAndAddCallees(impl, callerNodeId, depth, visited);
+                }
+            }
+            return;
+        }
 
-        BrowserManager.getInstance(project).showMessage(
-                "Scanning depth " + depth + "/" + maxDepth
+        showProgress("Scanning depth " + depth + "/" + maxDepth
                 + " — " + nodes.size() + " methods found so far...");
 
         // 1. Regular method calls: method(), sorted by source text offset for execution order

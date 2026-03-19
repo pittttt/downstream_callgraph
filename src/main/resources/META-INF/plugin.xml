@@ -40,6 +40,7 @@
         <projectService serviceImplementation="com.downstreamcallgraph.DownstreamCallGraphGenerator"/>
         <projectService serviceImplementation="com.downstreamcallgraph.UpstreamCallGraphGenerator"/>
         <projectService serviceImplementation="com.downstreamcallgraph.browser.BrowserManager"/>
+        <httpRequestHandler implementation="com.downstreamcallgraph.api.CallGraphHttpHandler"/>
     </extensions>
 
     <actions>
