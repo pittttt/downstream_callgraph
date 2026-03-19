@@ -24,7 +24,6 @@ public class CallGraphSettingsDialog extends DialogWrapper {
     private JBRadioButton useIdeColorButton;
     private JButton colorPickerButton;
     private JPanel colorPreview;
-    private JSpinner maxDepthSpinner;
     private JBCheckBox filterLibraryCheckBox;
     private JBCheckBox includeConstructorsCheckBox;
     private JBCheckBox includeMethodRefsCheckBox;
@@ -77,15 +76,7 @@ public class CallGraphSettingsDialog extends DialogWrapper {
         c.anchor = GridBagConstraints.WEST;
         c.insets = JBUI.insets(5, 5, 5, 5);
 
-        // Max depth
-        panel.add(new JLabel("Max Depth:"), c);
-        c.gridx = 1;
-        maxDepthSpinner = new JSpinner(new SpinnerNumberModel(settings.getMaxDepth(), 1, 15, 1));
-        panel.add(maxDepthSpinner, c);
-
         // Filter library methods
-        c.gridx = 0;
-        c.gridy = 1;
         c.gridwidth = 2;
         filterLibraryCheckBox = new JBCheckBox("Filter library/JDK methods", settings.isFilterLibraryMethods());
         panel.add(filterLibraryCheckBox, c);
@@ -231,7 +222,6 @@ public class CallGraphSettingsDialog extends DialogWrapper {
     protected void doOKAction() {
         settings.setBackgroundType(selectedBackgroundType);
         settings.setCustomBackgroundColor(selectedCustomColor);
-        settings.setMaxDepth((Integer) maxDepthSpinner.getValue());
         settings.setFilterLibraryMethods(filterLibraryCheckBox.isSelected());
         settings.setIncludeConstructors(includeConstructorsCheckBox.isSelected());
         settings.setIncludeMethodReferences(includeMethodRefsCheckBox.isSelected());

@@ -4,7 +4,6 @@ import com.downstreamcallgraph.CallGraphDataProvider;
 import com.downstreamcallgraph.DownstreamCallGraphGenerator;
 import com.downstreamcallgraph.UpstreamCallGraphGenerator;
 import com.downstreamcallgraph.export.MarkdownExporter;
-import com.downstreamcallgraph.settings.CallGraphSettings;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
@@ -59,7 +58,6 @@ public class CallGraphHttpHandler extends HttpRequestHandler {
         String methodName = getParam(urlDecoder, "method");
         String direction = getParam(urlDecoder, "direction", "downstream");
         String format = getParam(urlDecoder, "format", "markdown");
-        String maxDepthStr = getParam(urlDecoder, "maxDepth", null);
         boolean includeSource = !"false".equals(getParam(urlDecoder, "includeSource", "true"));
 
         if (className == null || className.isEmpty()) {
@@ -83,57 +81,42 @@ public class CallGraphHttpHandler extends HttpRequestHandler {
                 return;
             }
 
-            CallGraphSettings settings = CallGraphSettings.getInstance(project);
-            int originalMaxDepth = settings.getMaxDepth();
-            if (maxDepthStr != null) {
-                try {
-                    settings.setMaxDepth(Integer.parseInt(maxDepthStr));
-                } catch (NumberFormatException ignored) {
-                }
+            PsiClass psiClass = JavaPsiFacade.getInstance(project)
+                    .findClass(className, GlobalSearchScope.projectScope(project));
+            if (psiClass == null) {
+                errorRef.set("Class not found: " + className);
+                return;
             }
 
-            try {
-                PsiClass psiClass = JavaPsiFacade.getInstance(project)
-                        .findClass(className, GlobalSearchScope.projectScope(project));
-                if (psiClass == null) {
-                    errorRef.set("Class not found: " + className);
-                    return;
-                }
+            PsiMethod[] methods = psiClass.findMethodsByName(methodName, false);
+            if (methods.length == 0) {
+                errorRef.set("Method '" + methodName + "' not found in class " + className);
+                return;
+            }
 
-                PsiMethod[] methods = psiClass.findMethodsByName(methodName, false);
-                if (methods.length == 0) {
-                    errorRef.set("Method '" + methodName + "' not found in class " + className);
-                    return;
-                }
+            PsiMethod targetMethod = methods[0];
+            CallGraphDataProvider provider;
 
-                PsiMethod targetMethod = methods[0];
-                CallGraphDataProvider provider;
+            if ("upstream".equalsIgnoreCase(direction)) {
+                UpstreamCallGraphGenerator gen = UpstreamCallGraphGenerator.getInstance(project);
+                gen.generate(targetMethod, true);
+                provider = gen;
+            } else {
+                DownstreamCallGraphGenerator gen = DownstreamCallGraphGenerator.getInstance(project);
+                gen.generate(targetMethod, true);
+                provider = gen;
+            }
 
-                if ("upstream".equalsIgnoreCase(direction)) {
-                    UpstreamCallGraphGenerator gen = UpstreamCallGraphGenerator.getInstance(project);
-                    gen.generate(targetMethod, true);
-                    provider = gen;
-                } else {
-                    DownstreamCallGraphGenerator gen = DownstreamCallGraphGenerator.getInstance(project);
-                    gen.generate(targetMethod, true);
-                    provider = gen;
-                }
-
-                if ("json".equalsIgnoreCase(format)) {
-                    resultRef.set(provider.getJson());
-                } else {
-                    resultRef.set(MarkdownExporter.export(
-                            provider.getNodeInfoList(),
-                            provider.getEdgeInfoList(),
-                            provider.getMaxDepth(),
-                            includeSource,
-                            provider.getDirection()
-                    ));
-                }
-            } finally {
-                if (maxDepthStr != null) {
-                    settings.setMaxDepth(originalMaxDepth);
-                }
+            if ("json".equalsIgnoreCase(format)) {
+                resultRef.set(provider.getJson());
+            } else {
+                resultRef.set(MarkdownExporter.export(
+                        provider.getNodeInfoList(),
+                        provider.getEdgeInfoList(),
+                        provider.getMaxDepth(),
+                        includeSource,
+                        provider.getDirection()
+                ));
             }
         });
 

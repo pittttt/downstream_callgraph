@@ -27,7 +27,6 @@ public final class DownstreamCallGraphGenerator implements CallGraphDataProvider
     private final List<EdgeInfo> edgeInfoList = new ArrayList<>();
     private final Map<String, Integer> methodKeyToNodeId = new HashMap<>();
     private PsiMethod lastGeneratedMethod;
-    private int maxDepth = 5;
     private int nextNodeId = 1;
     private int nextEdgeId = 1;
     private boolean silent;
@@ -86,8 +85,6 @@ public final class DownstreamCallGraphGenerator implements CallGraphDataProvider
 
     public String generate(PsiMethod mainMethod, boolean silent) {
         this.silent = silent;
-        CallGraphSettings settings = CallGraphSettings.getInstance(project);
-        this.maxDepth = settings.getMaxDepth();
 
         showProgress("Clearing the graph...");
         clear();
@@ -105,7 +102,7 @@ public final class DownstreamCallGraphGenerator implements CallGraphDataProvider
         createGroupIfNotExists(mainMethod);
         nodes.add(mainNode);
 
-        showProgress("Collecting downstream callees (depth 0/" + maxDepth + ")...");
+        showProgress("Collecting downstream callees...");
 
         Set<String> visited = new HashSet<>();
         visited.add(mainKey);
@@ -149,8 +146,6 @@ public final class DownstreamCallGraphGenerator implements CallGraphDataProvider
     }
 
     private void findAndAddCallees(PsiMethod method, int callerNodeId, int depth, Set<String> visited) {
-        if (depth >= maxDepth) return;
-
         CallGraphSettings settings = CallGraphSettings.getInstance(project);
         PsiCodeBlock body = method.getBody();
         if (body == null) {
@@ -164,7 +159,7 @@ public final class DownstreamCallGraphGenerator implements CallGraphDataProvider
             return;
         }
 
-        showProgress("Scanning depth " + depth + "/" + maxDepth
+        showProgress("Scanning depth " + depth
                 + " — " + nodes.size() + " methods found so far...");
 
         // 1. Regular method calls: method(), sorted by source text offset for execution order
@@ -499,6 +494,10 @@ public final class DownstreamCallGraphGenerator implements CallGraphDataProvider
 
     @Override
     public int getMaxDepth() {
-        return maxDepth;
+        int max = 0;
+        for (NodeInfo node : nodeInfoList) {
+            if (node.level > max) max = node.level;
+        }
+        return max;
     }
 }

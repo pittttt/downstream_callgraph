@@ -19,7 +19,6 @@ public class CallGraphSettings implements PersistentStateComponent<CallGraphSett
 
     private String backgroundType = BACKGROUND_TYPE_CUSTOM;
     private String customBackgroundColor = "#000000";
-    private int maxDepth = 5;
     private boolean filterLibraryMethods = true;
     private boolean includeConstructors = true;
     private boolean includeMethodReferences = true;
@@ -56,14 +55,6 @@ public class CallGraphSettings implements PersistentStateComponent<CallGraphSett
 
     public void setCustomBackgroundColor(String customBackgroundColor) {
         this.customBackgroundColor = customBackgroundColor;
-    }
-
-    public int getMaxDepth() {
-        return maxDepth;
-    }
-
-    public void setMaxDepth(int maxDepth) {
-        this.maxDepth = Math.max(1, Math.min(15, maxDepth));
     }
 
     public boolean isFilterLibraryMethods() {

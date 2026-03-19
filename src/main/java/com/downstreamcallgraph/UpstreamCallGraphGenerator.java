@@ -29,7 +29,6 @@ public final class UpstreamCallGraphGenerator implements CallGraphDataProvider {
     private final List<DownstreamCallGraphGenerator.EdgeInfo> edgeInfoList = new ArrayList<>();
     private final Map<String, Integer> methodKeyToNodeId = new HashMap<>();
     private PsiMethod lastGeneratedMethod;
-    private int maxDepth = 5;
     private int nextNodeId = 1;
     private int nextEdgeId = 1;
     private boolean silent;
@@ -48,8 +47,6 @@ public final class UpstreamCallGraphGenerator implements CallGraphDataProvider {
 
     public String generate(PsiMethod targetMethod, boolean silent) {
         this.silent = silent;
-        CallGraphSettings settings = CallGraphSettings.getInstance(project);
-        this.maxDepth = settings.getMaxDepth();
 
         showProgress("Clearing the graph...");
         clear();
@@ -420,6 +417,10 @@ public final class UpstreamCallGraphGenerator implements CallGraphDataProvider {
 
     @Override
     public int getMaxDepth() {
-        return maxDepth;
+        int max = 0;
+        for (DownstreamCallGraphGenerator.NodeInfo node : nodeInfoList) {
+            if (node.level > max) max = node.level;
+        }
+        return max;
     }
 }

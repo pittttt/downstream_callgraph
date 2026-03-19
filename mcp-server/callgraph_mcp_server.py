@@ -49,7 +49,6 @@ async def _call_idea(params: dict) -> str:
 async def generate_downstream_callgraph(
     class_name: str,
     method_name: str,
-    max_depth: int = 5,
     include_source: bool = True,
     format: str = "markdown",
 ) -> str:
@@ -59,7 +58,6 @@ async def generate_downstream_callgraph(
     Args:
         class_name: Fully qualified class name, e.g. com.example.service.OrderService
         method_name: Method name, e.g. processOrder
-        max_depth: Maximum recursion depth (1-15, default 5)
         include_source: Include source code of each method in output (default True)
         format: Output format - "markdown" (default, best for reading) or "json"
     """
@@ -68,7 +66,6 @@ async def generate_downstream_callgraph(
         "method": method_name,
         "direction": "downstream",
         "format": format,
-        "maxDepth": max_depth,
         "includeSource": str(include_source).lower(),
     })
 
@@ -77,7 +74,6 @@ async def generate_downstream_callgraph(
 async def generate_upstream_callgraph(
     class_name: str,
     method_name: str,
-    max_depth: int = 5,
     include_source: bool = True,
     format: str = "markdown",
 ) -> str:
@@ -88,7 +84,6 @@ async def generate_upstream_callgraph(
     Args:
         class_name: Fully qualified class name, e.g. com.example.service.OrderService
         method_name: Method name, e.g. processOrder
-        max_depth: Maximum recursion depth (1-15, default 5)
         include_source: Include source code of each method in output (default True)
         format: Output format - "markdown" (default, best for reading) or "json"
     """
@@ -97,7 +92,6 @@ async def generate_upstream_callgraph(
         "method": method_name,
         "direction": "upstream",
         "format": format,
-        "maxDepth": max_depth,
         "includeSource": str(include_source).lower(),
     })
 
