@@ -65,6 +65,7 @@ public class GenerateUpstreamCallGraphAction extends AnAction implements DumbAwa
                                     + generator.getEdgeInfoList().size() + " calls). "
                                     + "Visual rendering is disabled. Use Export Markdown to get results.");
                             browserManager.updateStats(generator.getMaxDepth(), generator.getNodeInfoList().size());
+                            browserManager.showGraphControls();
                         }
                         browserManager.setGenerateMessage("+FOR " + method.getName());
                     });

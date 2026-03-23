@@ -252,6 +252,7 @@ window.updateStats = updateStats;
 window.clearStats = clearStats;
 window.fit = fit;
 window.showMessage = showMessage;
+window.showGraphControls = showGraphControls;
 window.setGenerateMessage = setGenerateMessage;
 window.updateMessageTextColor = updateMessageTextColor;
 window.resetDefaultMessages = resetDefaultMessages;

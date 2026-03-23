@@ -66,6 +66,10 @@ public final class BrowserManager {
         executeJavaScript("updateStats(" + maxDepth + ", " + totalMethods + ")");
     }
 
+    public void showGraphControls() {
+        executeJavaScript("showGraphControls()");
+    }
+
     public void setGenerateMessage(String message) {
         executeJavaScript("setGenerateMessage('" + message + "')");
     }
