@@ -62,6 +62,10 @@ public final class BrowserManager {
         executeJavaScript("updateNetwork(" + json + ")");
     }
 
+    public void updateStats(int maxDepth, int totalMethods) {
+        executeJavaScript("updateStats(" + maxDepth + ", " + totalMethods + ")");
+    }
+
     public void setGenerateMessage(String message) {
         executeJavaScript("setGenerateMessage('" + message + "')");
     }

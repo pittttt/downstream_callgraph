@@ -96,6 +96,19 @@
             margin-left: 4px;
             font-size: 0.9em;
         }
+
+        .stats-overlay {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            color: #AAA;
+            font-size: 0.85em;
+            font-family: 'Consolas', 'Menlo', monospace;
+            line-height: 1.6;
+            pointer-events: none;
+            z-index: 10;
+            text-shadow: 0 0 4px rgba(0,0,0,0.8);
+        }
     </style>
 </head>
 
@@ -150,6 +163,8 @@
         </button>
     </div>
 </div>
+
+<div id="stats-overlay" class="stats-overlay"></div>
 
 <script defer="defer">
     <% /*

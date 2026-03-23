@@ -19,6 +19,7 @@ const messageElement = document.getElementById("message");
 const networkElement = document.getElementById("network");
 const generateMessage = document.getElementById("generateMessage");
 const showAllButton = document.getElementById("showAllButton");
+const statsOverlay = document.getElementById("stats-overlay");
 
 const network = new vis.Network(networkElement, {}, options);
 let hiddenNodes = new Set();
@@ -144,6 +145,18 @@ function hideGraphControls() {
     }
 }
 
+function updateStats(maxDepth, totalMethods) {
+    if (statsOverlay) {
+        statsOverlay.innerHTML = "Max Depth: " + maxDepth + " &nbsp;|&nbsp; Methods: " + totalMethods;
+    }
+}
+
+function clearStats() {
+    if (statsOverlay) {
+        statsOverlay.innerHTML = "";
+    }
+}
+
 function updateNetwork(data) {
     hideGraphControls();
     hiddenNodes.clear();
@@ -155,6 +168,15 @@ function updateNetwork(data) {
     var nodeCount = data.nodes ? data.nodes.length : 0;
     var edgeCount = data.edges ? data.edges.length : 0;
     showMessage("Rendering graph... (" + nodeCount + " nodes, " + edgeCount + " edges)");
+
+    var maxLevel = 0;
+    if (data.nodes) {
+        for (var i = 0; i < data.nodes.length; i++) {
+            var lvl = data.nodes[i].level || 0;
+            if (lvl > maxLevel) maxLevel = lvl;
+        }
+    }
+    updateStats(maxLevel, nodeCount);
 
     try {
         options.groups = data.groups;
@@ -226,6 +248,8 @@ function resetDefaultMessages() {
 }
 
 window.updateNetwork = updateNetwork;
+window.updateStats = updateStats;
+window.clearStats = clearStats;
 window.fit = fit;
 window.showMessage = showMessage;
 window.setGenerateMessage = setGenerateMessage;

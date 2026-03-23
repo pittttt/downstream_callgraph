@@ -4,6 +4,7 @@ import com.downstreamcallgraph.DownstreamCallGraphGenerator;
 import com.downstreamcallgraph.Utils;
 import com.downstreamcallgraph.browser.BrowserManager;
 import com.downstreamcallgraph.browser.JSQueryHandler;
+import com.downstreamcallgraph.settings.CallGraphSettings;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -43,10 +44,22 @@ public class GenerateGraphHandler extends JSQueryHandler {
                 ProgressManager.getInstance().run(new Task.Backgroundable(project, "Generating Downstream Call Graph") {
                     public void run(@NotNull ProgressIndicator progressIndicator) {
                         ApplicationManager.getApplication().runReadAction(() -> {
-                            String graph = DownstreamCallGraphGenerator.getInstance(project).generate(method);
+                            DownstreamCallGraphGenerator generator = DownstreamCallGraphGenerator.getInstance(project);
+                            String graph = generator.generate(method);
                             BrowserManager browserManager = BrowserManager.getInstance(project);
-                            browserManager.showMessage("Sending graph to embedded browser...");
-                            browserManager.updateNetwork(graph);
+                            browserManager.setActiveProvider(generator);
+                            CallGraphSettings settings = CallGraphSettings.getInstance(project);
+                            if (settings.isRenderVisualGraph()) {
+                                browserManager.showMessage("Sending graph to embedded browser...");
+                                browserManager.updateNetwork(graph);
+                            } else {
+                                browserManager.showMessage("Graph data generated ("
+                                        + generator.getNodeInfoList().size() + " methods, "
+                                        + generator.getEdgeInfoList().size() + " calls). "
+                                        + "Visual rendering is disabled. Use Export Markdown to get results.");
+                                browserManager.updateStats(generator.getMaxDepth(), generator.getNodeInfoList().size());
+                            }
+                            browserManager.setGenerateMessage("+FOR " + method.getName());
                         });
                     }
                 });
