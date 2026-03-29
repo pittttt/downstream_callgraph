@@ -145,9 +145,12 @@ function hideGraphControls() {
     }
 }
 
-function updateStats(maxDepth, totalMethods) {
+function updateStats(maxDepth, totalMethods, classCount) {
     if (statsOverlay) {
-        statsOverlay.innerHTML = "Max Depth: " + maxDepth + " &nbsp;|&nbsp; Methods: " + totalMethods;
+        var classesPart = (classCount !== undefined && classCount !== null)
+            ? " &nbsp;|&nbsp; Classes: " + classCount
+            : "";
+        statsOverlay.innerHTML = "Max Depth: " + maxDepth + " &nbsp;|&nbsp; Methods: " + totalMethods + classesPart;
     }
 }
 
@@ -170,13 +173,16 @@ function updateNetwork(data) {
     showMessage("Rendering graph... (" + nodeCount + " nodes, " + edgeCount + " edges)");
 
     var maxLevel = 0;
+    var classKeys = new Set();
     if (data.nodes) {
         for (var i = 0; i < data.nodes.length; i++) {
-            var lvl = data.nodes[i].level || 0;
+            var n = data.nodes[i];
+            var lvl = n.level || 0;
             if (lvl > maxLevel) maxLevel = lvl;
+            if (n.group) classKeys.add(n.group);
         }
     }
-    updateStats(maxLevel, nodeCount);
+    updateStats(maxLevel, nodeCount, classKeys.size);
 
     try {
         options.groups = data.groups;

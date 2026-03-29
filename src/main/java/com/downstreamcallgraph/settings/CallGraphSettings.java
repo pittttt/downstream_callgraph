@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
         name = "DownstreamCallGraphSettings",
         storages = {@Storage("downstream-callgraph-settings.xml")}
 )
-public class CallGraphSettings implements PersistentStateComponent<CallGraphSettings> {
+public final class CallGraphSettings implements PersistentStateComponent<CallGraphSettings> {
     public static final String BACKGROUND_TYPE_CUSTOM = "custom";
     public static final String BACKGROUND_TYPE_IDE = "ide";
 

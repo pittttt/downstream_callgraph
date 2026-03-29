@@ -63,7 +63,8 @@ public class GenerateCallGraphAction extends AnAction implements DumbAware {
                                     + generator.getNodeInfoList().size() + " methods, "
                                     + generator.getEdgeInfoList().size() + " calls). "
                                     + "Visual rendering is disabled. Use Export Markdown to get results.");
-                            browserManager.updateStats(generator.getMaxDepth(), generator.getNodeInfoList().size());
+                            browserManager.updateStats(generator.getMaxDepth(), generator.getNodeInfoList().size(),
+                                    generator.getDistinctQualifiedClassCount());
                             browserManager.showGraphControls();
                         }
                         browserManager.setGenerateMessage("+FOR " + method.getName());

@@ -13,4 +13,11 @@ public interface CallGraphDataProvider {
     int getMaxDepth();
     String getJson();
     String getDirection();
+
+    default int getDistinctQualifiedClassCount() {
+        return (int) getNodeInfoList().stream()
+                .map(n -> n.qualifiedClassName)
+                .distinct()
+                .count();
+    }
 }

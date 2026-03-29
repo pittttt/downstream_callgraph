@@ -62,8 +62,8 @@ public final class BrowserManager {
         executeJavaScript("updateNetwork(" + json + ")");
     }
 
-    public void updateStats(int maxDepth, int totalMethods) {
-        executeJavaScript("updateStats(" + maxDepth + ", " + totalMethods + ")");
+    public void updateStats(int maxDepth, int totalMethods, int classCount) {
+        executeJavaScript("updateStats(" + maxDepth + ", " + totalMethods + ", " + classCount + ")");
     }
 
     public void showGraphControls() {
